@@ -71,7 +71,6 @@ interface NavbarProps {
 }
 
 // Inline Navbar Component
-// 2. Updated Navbar Component
 function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace }: NavbarProps) {
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
     `px-5 py-2 rounded-lg font-bold transition-all duration-300 ${isActive
@@ -80,15 +79,15 @@ function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRa
     }`;
 
   return (
-    <header className="w-full bg-[#090d16] border-b border-slate-800/80 sticky top-0 z-50 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
-      <div className="max-w-[2560px] mx-auto px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-6 transition-all">
+    <header className="w-full bg-[#090d16] border-b border-slate-800/80 sticky top-0 z-[100] shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+      <div className="w-full max-w-[2560px] mx-auto px-6 py-4 flex flex-col xl:flex-row items-center justify-between gap-4">
 
         {/* Left: Logo */}
         <div className="flex items-center gap-3 cursor-default w-full xl:w-auto justify-center xl:justify-start">
           <img
             src="/f1-favicon.png"
             alt="F1 Logo"
-            className="h-12 w-auto object-contain drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+            className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]"
           />
           <span className="text-xl lg:text-2xl font-bold text-white tracking-wide uppercase font-sans">
             Telemetry Dashboard
@@ -96,7 +95,7 @@ function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRa
         </div>
 
         {/* Center: Navigation (Page Links) */}
-        <div className="flex-1 flex items-center justify-center w-full">
+        <div className="flex items-center justify-center w-full xl:w-auto">
           <div className="flex gap-1 bg-[#04060a] p-1.5 rounded-xl border border-slate-800/50 shadow-inner">
             <NavLink to="/" className={linkClasses}>Overview</NavLink>
             <NavLink to="/analytics" className={linkClasses}>Analytics</NavLink>
@@ -388,7 +387,7 @@ export default function App() {
           upcomingRace={seasonsCache[year]?.upcomingRace || null}
         />
 
-        <div className="w-full max-w-[2560px] mx-auto p-6 flex flex-col gap-8 flex-1">
+        <div className="w-full max-w-[2560px] mx-auto px-6 pt-8 pb-6 flex flex-col gap-8 flex-1">
 
           {sessions.length > 0 && (
             <Routes>

@@ -1,11 +1,10 @@
 import { animated as a, SpringValue, useSpring } from '@react-spring/three';
 import { Center, ContactShadows, Environment, Html, OrbitControls, useGLTF } from '@react-three/drei';
-import { Canvas, useFrame } from '@react-three/fiber'; // <--- useFrame added here!
+import { Canvas, useFrame } from '@react-three/fiber';
 import { Suspense, useState } from 'react';
 
 const CAR_SCALE = 4.5;
 
-// 1. Updated: nodeName is now nodeNames (an array of strings)
 const CAR_PARTS = [
     {
         id: 'front-wing',
@@ -89,7 +88,6 @@ function CarScene({ activePart, setActivePart, explosionProgress }: {
         scene: import('three').Group
     };
 
-    // 🚨 FIX 1: Animate meshes entirely in-place to preserve their original 3D transformations
     useFrame(() => {
         const val = explosionProgress.get();
 
@@ -97,15 +95,12 @@ function CarScene({ activePart, setActivePart, explosionProgress }: {
             part.nodeNames.forEach((nodeName) => {
                 const node = nodes[nodeName];
                 if (node) {
-                    // Save the exact original socket position from Blender once
                     if (!node.userData.origLocalPos) {
                         node.userData.origLocalPos = node.position.clone();
                     }
 
-                    // Start from that exact original position
                     node.position.copy(node.userData.origLocalPos);
 
-                    // Add the explosion direction offset directly to the local coordinate!
                     node.position.x += part.explodeDir[0] * val;
                     node.position.y += part.explodeDir[1] * val;
                     node.position.z += part.explodeDir[2] * val;
@@ -116,10 +111,8 @@ function CarScene({ activePart, setActivePart, explosionProgress }: {
 
     return (
         <group scale={CAR_SCALE}>
-            {/* The Full Car renders here as one solid, unbroken piece with its native hierarchy completely intact! */}
             <primitive object={scene} />
 
-            {/* 🚨 FIX 2: Map through parts STRICTLY to position the UI Dots. No 3D meshes exist in this loop anymore! */}
             {CAR_PARTS.map((part) => (
                 <a.group
                     key={part.id}
@@ -129,7 +122,8 @@ function CarScene({ activePart, setActivePart, explosionProgress }: {
                         part.explodeDir[2] * val,
                     ]) as unknown as [number, number, number]}
                 >
-                    <Html position={part.position as [number, number, number]}>
+                    {/* Added zIndexRange={[0, 0]} so HTML tags respect canvas depth and don't overlap the navbar */}
+                    <Html position={part.position as [number, number, number]} zIndexRange={[0, 0]}>
                         <div
                             className="relative cursor-pointer group flex items-center"
                             onClick={() => setActivePart(activePart === part.id ? null : part.id)}
@@ -162,7 +156,7 @@ export default function F1CarViewer() {
     });
 
     return (
-        <div className="w-full bg-[#0a0f18] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[650px] font-sans">
+        <div className="w-full bg-[#0a0f18] border border-slate-800 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-[750px] font-sans">
             <div className="p-4 border-b border-slate-800/80 flex justify-between items-center bg-gradient-to-r from-slate-900 to-slate-950">
                 <div className="flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
