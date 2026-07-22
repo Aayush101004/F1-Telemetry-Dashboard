@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { fetchF1SeasonData } from './api';
 import CircuitMap from './components/CircuitMap';
 import ConstructorStandings from './components/ConstructorStandings';
@@ -60,6 +61,66 @@ const CONSTRUCTOR_BASELINE_STATS: Record<string, { poles: number; podiums: numbe
   haas: { poles: 1, podiums: 0, titles: 0, debut: 2016 }
 };
 
+interface NavbarProps {
+  year: number;
+  setYear: (year: number) => void;
+  sessions: SessionData[];
+  scopeIndex: number;
+  setScopeIndex: (index: number) => void;
+  upcomingRace: UpcomingRace | null;
+}
+
+// Inline Navbar Component
+// 2. Updated Navbar Component
+function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace }: NavbarProps) {
+  const linkClasses = ({ isActive }: { isActive: boolean }) =>
+    `px-5 py-2 rounded-lg font-bold transition-all duration-300 ${isActive
+      ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
+      : "text-slate-400 hover:text-white hover:bg-slate-800"
+    }`;
+
+  return (
+    <header className="w-full bg-[#090d16] border-b border-slate-800/80 sticky top-0 z-50 shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
+      <div className="max-w-[2560px] mx-auto px-6 py-3 flex flex-col xl:flex-row items-center justify-between gap-6 transition-all">
+
+        {/* Left: Logo */}
+        <div className="flex items-center gap-3 cursor-default w-full xl:w-auto justify-center xl:justify-start">
+          <img
+            src="/f1-favicon.png"
+            alt="F1 Logo"
+            className="h-12 w-auto object-contain drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+          />
+          <span className="text-xl lg:text-2xl font-bold text-white tracking-wide uppercase font-sans">
+            Telemetry Dashboard
+          </span>
+        </div>
+
+        {/* Center: Navigation (Page Links) */}
+        <div className="flex-1 flex items-center justify-center w-full">
+          <div className="flex gap-1 bg-[#04060a] p-1.5 rounded-xl border border-slate-800/50 shadow-inner">
+            <NavLink to="/" className={linkClasses}>Overview</NavLink>
+            <NavLink to="/analytics" className={linkClasses}>Analytics</NavLink>
+            <NavLink to="/showroom" className={linkClasses}>Showroom</NavLink>
+          </div>
+        </div>
+
+        {/* Right: Dashboard Controls (Timer & Dropdowns) */}
+        <div className="flex items-center w-full xl:w-auto justify-center xl:justify-end">
+          <DashboardControls
+            year={year}
+            setYear={setYear}
+            sessions={sessions}
+            scopeIndex={scopeIndex}
+            setScopeIndex={setScopeIndex}
+            upcomingRace={upcomingRace}
+          />
+        </div>
+
+      </div>
+    </header>
+  );
+}
+
 export default function App() {
   const [year, setYear] = useState<number>(2026);
   const [scopeIndex, setScopeIndex] = useState<number>(0);
@@ -109,7 +170,6 @@ export default function App() {
     setSelectedTeams(new Set(Object.keys(teamHist).sort((a, b) => teamHist[b] - teamHist[a]).slice(0, 3)));
   };
 
-  // Auto-select race when timer hits 00:00:00:00
   useEffect(() => {
     const checkCountdown = () => {
       const upcoming = seasonsCache[year]?.upcomingRace;
@@ -133,7 +193,6 @@ export default function App() {
     const bootSequence = async () => {
       const years = [2023, 2024, 2025, 2026];
       const cache: Record<number, { sessions: SessionData[], upcomingRace: UpcomingRace | null }> = {};
-
       const timeline: Record<number, Record<number, Record<string, { poles: number; podiums: number; titles: number; debut: number }>>> = {};
       const teamTimeline: Record<number, Record<number, Record<string, { poles: number; podiums: number; titles: number; debut: number }>>> = {};
 
@@ -252,7 +311,6 @@ export default function App() {
   const handleYearChange = (newYear: number) => { setYear(newYear); applyDefaultsForYear(newYear, seasonsCache); };
   const sessions = useMemo(() => seasonsCache[year]?.sessions || [], [seasonsCache, year]);
 
-  // Real-Time Standings & Graph State Calculation
   const processedState = useMemo<ProcessedSeasonState>(() => {
     const state: ProcessedSeasonState = {
       globalNames: {}, driverTeamMap: {}, globalHistory: {}, teamHistory: {}, roundScores: [],
@@ -283,11 +341,9 @@ export default function App() {
         state.teamHistory[tId][idx] = idx > 0 ? state.teamHistory[tId][idx - 1] : 0;
       });
 
-      // Live updates apply to the active scopeIndex while race is ongoing
       const isCurrentScopeLive = liveState.isRaceOngoing && idx === scopeIndex;
 
       if (isCurrentScopeLive && liveState.currentLap >= 2) {
-        // Real-time position and points calculation
         Object.values(liveState.driverPositions).forEach(driver => {
           const dId = driver.driverId;
           const tId = state.driverTeamMap[dId] || getNormalizedTeamKey(undefined, dId);
@@ -298,7 +354,6 @@ export default function App() {
           state.teamHistory[tId][idx] = (idx > 0 ? state.teamHistory[tId][idx - 1] : 0) + pts;
         });
       } else {
-        // Standard session calculation (Lap 1 or past completed races)
         session.results.forEach(r => {
           const dId = r.Driver.driverId;
           const tId = getNormalizedTeamKey(r.Constructor?.constructorId, dId);
@@ -315,93 +370,118 @@ export default function App() {
   }, [sessions, globalHistoricalStats, globalTeamHistoricalStats, year, driverStats, teamStats, scopeIndex, liveState]);
 
   if (loadingMsg) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-950 gap-6">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#04060a] gap-6">
       <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
       <div className="text-slate-300 text-lg font-black tracking-widest uppercase animate-pulse">{loadingMsg}</div>
     </div>
   );
 
   return (
-    <div className="min-h-screen w-full max-w-[2560px] mx-auto p-6 flex flex-col gap-8">
-      <DashboardControls year={year} setYear={handleYearChange} sessions={sessions} scopeIndex={scopeIndex} setScopeIndex={setScopeIndex} upcomingRace={seasonsCache[year]?.upcomingRace || null} />
-      {sessions.length > 0 && (
-        <>
+    <BrowserRouter>
+      <div className="min-h-screen w-full bg-[#04060a] flex flex-col text-slate-200 font-sans">
+        <Navbar
+          year={year}
+          setYear={handleYearChange}
+          sessions={sessions}
+          scopeIndex={scopeIndex}
+          setScopeIndex={setScopeIndex}
+          upcomingRace={seasonsCache[year]?.upcomingRace || null}
+        />
 
-          <div className="flex flex-row gap-8">
-            <div className="w-1/3">
-              <StandingsTables state={processedState} scopeIndex={scopeIndex} selectedDrivers={selectedDrivers} setSelectedDrivers={setSelectedDrivers} setTooltipState={setTooltipState} />
-            </div>
-            <div className="w-2/3">
-              <ProgressionCharts state={processedState} sessions={sessions} scopeIndex={scopeIndex} selectedDrivers={selectedDrivers} type="drivers" />
-            </div>
-          </div>
+        <div className="w-full max-w-[2560px] mx-auto p-6 flex flex-col gap-8 flex-1">
 
-          <div className="flex flex-row gap-8">
-            <div className="w-1/3">
-              <ConstructorStandings state={processedState} scopeIndex={scopeIndex} selectedTeams={selectedTeams} setSelectedTeams={setSelectedTeams} year={year} setTooltipState={setTooltipState} />
-            </div>
-            <div className="w-2/3">
-              <ProgressionCharts state={processedState} sessions={sessions} scopeIndex={scopeIndex} selectedTeams={selectedTeams} type="constructors" />
-            </div>
-          </div>
+          {sessions.length > 0 && (
+            <Routes>
+              {/* PAGE 1: OVERVIEW (Standings & Highlights) */}
+              <Route path="/" element={
+                <div className="flex flex-col gap-8 w-full animate-fadeIn">
+                  <div className="flex flex-row gap-8">
+                    <div className="w-1/3">
+                      <StandingsTables state={processedState} scopeIndex={scopeIndex} selectedDrivers={selectedDrivers} setSelectedDrivers={setSelectedDrivers} setTooltipState={setTooltipState} />
+                    </div>
+                    <div className="w-2/3">
+                      <ProgressionCharts state={processedState} sessions={sessions} scopeIndex={scopeIndex} selectedDrivers={selectedDrivers} type="drivers" />
+                    </div>
+                  </div>
 
-          <DetailedBreakdown session={sessions[scopeIndex]} state={processedState} scopeIndex={scopeIndex} liveState={liveState} />
+                  <div className="flex flex-row gap-8">
+                    <div className="w-1/3">
+                      <ConstructorStandings state={processedState} scopeIndex={scopeIndex} selectedTeams={selectedTeams} setSelectedTeams={setSelectedTeams} year={year} setTooltipState={setTooltipState} />
+                    </div>
+                    <div className="w-2/3">
+                      <ProgressionCharts state={processedState} sessions={sessions} scopeIndex={scopeIndex} selectedTeams={selectedTeams} type="constructors" />
+                    </div>
+                  </div>
 
-          <div className="w-full">
-            <SessionHighlights sessions={sessions} scopeIndex={scopeIndex} state={processedState} year={year} liveState={liveState} />
-          </div>
+                  <div className="w-full">
+                    <SessionHighlights sessions={sessions} scopeIndex={scopeIndex} state={processedState} year={year} liveState={liveState} />
+                  </div>
+                </div>
+              } />
 
-          {/* Head-to-Head Comparison Tool */}
-          <HeadToHeadComparison state={processedState} />
+              {/* PAGE 2: ANALYTICS (Head-to-head & Detailed Breakdowns) */}
+              <Route path="/analytics" element={
+                <div className="flex flex-col gap-8 w-full animate-fadeIn">
+                  <DetailedBreakdown session={sessions[scopeIndex]} state={processedState} scopeIndex={scopeIndex} liveState={liveState} />
+                  <HeadToHeadComparison state={processedState} />
+                </div>
+              } />
 
-          {year === 2026 && (
-            <RacePredictions
-              state={processedState}
-              scopeIndex={scopeIndex + 1}
-              sessions={sessions}
-              upcomingRace={seasonsCache[year]?.upcomingRace}
-              liveState={liveState}
-            />
+              {/* PAGE 3: SHOWROOM (3D Cars, Grid, Maps, Predictions) */}
+              <Route path="/showroom" element={
+                <div className="flex flex-col gap-8 w-full animate-fadeIn">
+
+                  <div className="flex flex-col gap-8 w-full">
+                    <div className="w-full">
+                      <F1CarViewer />
+                    </div>
+                    <div className="w-full h-auto">
+                      {(() => {
+                        interface ApiSession { title?: string; }
+                        const currentSession = sessions[scopeIndex] as unknown as ApiSession;
+                        return (
+                          <CircuitMap
+                            circuitName={currentSession?.title}
+                            raceName={currentSession?.title}
+                          />
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {year === 2026 && (
+                    <RacePredictions
+                      state={processedState}
+                      scopeIndex={scopeIndex + 1}
+                      sessions={sessions}
+                      upcomingRace={seasonsCache[year]?.upcomingRace}
+                      liveState={liveState}
+                    />
+                  )}
+
+                  <DriversGrid state={processedState} scopeIndex={scopeIndex} />
+
+                </div>
+              } />
+            </Routes>
           )}
-
-          <DriversGrid state={processedState} scopeIndex={scopeIndex} />
-
-          <div className="flex flex-col gap-8 w-full">
-            <div className="w-full">
-              <F1CarViewer />
-            </div>
-            <div className="w-full h-auto">
-              {(() => {
-                interface ApiSession {
-                  title?: string;
-                }
-                const currentSession = sessions[scopeIndex] as unknown as ApiSession;
-
-                return (
-                  <CircuitMap
-                    circuitName={currentSession?.title}
-                    raceName={currentSession?.title}
-                  />
-                );
-              })()}
-            </div>
-          </div>
-        </>
-      )}
-      <GlobalTooltip tooltip={tooltipState} state={processedState} scopeIndex={scopeIndex} />
-
-      {/* Global Footer */}
-      <footer className="w-full border-t border-slate-800/60 bg-[#060b14] py-8 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col items-center justify-center gap-3">
-          <p className="text-sm font-black text-slate-400 tracking-[0.2em] uppercase">
-            Engineered by Aayush Khanna
-          </p>
-          <div className="w-12 h-[2px] bg-red-600/50 rounded-full"></div>
-          <p className="text-[10px] text-slate-600 font-bold tracking-wider uppercase">
-            F1 Telemetry & Analytics Dashboard © {new Date().getFullYear()}
-          </p>
         </div>
-      </footer>
-    </div>
+
+        <GlobalTooltip tooltip={tooltipState} state={processedState} scopeIndex={scopeIndex} />
+
+        {/* Global Footer */}
+        <footer className="w-full border-t border-slate-800/60 bg-[#060b14] py-8 mt-auto">
+          <div className="max-w-7xl mx-auto px-4 flex flex-col items-center justify-center gap-3">
+            <p className="text-sm font-black text-slate-400 tracking-[0.2em] uppercase">
+              Engineered by Aayush Khanna
+            </p>
+            <div className="w-12 h-[2px] bg-red-600/50 rounded-full"></div>
+            <p className="text-[10px] text-slate-600 font-bold tracking-wider uppercase">
+              F1 Telemetry & Analytics Dashboard © {new Date().getFullYear()}
+            </p>
+          </div>
+        </footer>
+      </div>
+    </BrowserRouter>
   );
 }

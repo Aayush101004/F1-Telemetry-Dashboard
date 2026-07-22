@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import type { SessionData, UpcomingRace } from '../types';
 
 interface Props {
-    year: number; 
+    year: number;
     setYear: (y: number) => void;
     sessions: SessionData[];
-    scopeIndex: number; 
+    scopeIndex: number;
     setScopeIndex: (idx: number) => void;
     upcomingRace: UpcomingRace | null;
 }
@@ -34,12 +34,7 @@ export default function DashboardControls({ year, setYear, sessions, scopeIndex,
     }, [upcomingRace, year]);
 
     return (
-        <div className="flex flex-col md:flex-row items-center gap-4 mb-8 bg-slate-900/40 p-4 rounded-xl border border-slate-800">
-            <div className="flex items-center gap-3">
-                <div className="h-6 w-1.5 bg-red-600 rounded-full"></div>
-                <h1 className="text-2xl font-black text-white uppercase tracking-wider">F1 Telemetry Dashboard</h1>
-            </div>
-
+        <div className="flex flex-col md:flex-row items-center gap-6 w-full justify-center">
             {/* The Live Countdown Timer */}
             <div className="flex flex-col mx-auto bg-slate-950 px-4 py-2 rounded-lg border border-slate-800 shadow-inner">
                 {year !== 2026 ? (
