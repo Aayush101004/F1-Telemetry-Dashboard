@@ -7,6 +7,7 @@ import DashboardControls from './components/DashboardControls';
 import DetailedBreakdown from './components/DetailedBreakdown';
 import DriversGrid from './components/DriversGrid';
 import F1CarViewer from './components/F1CarViewer';
+import F1Loader from './components/F1Loader';
 import GlobalTooltip from './components/GlobalTooltip';
 import HeadToHeadComparison from './components/HeadToHeadComparison';
 import ProgressionCharts from './components/ProgressionCharts';
@@ -87,7 +88,7 @@ function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRa
           <img
             src="/f1-favicon.png"
             alt="F1 Logo"
-            className="h-10 w-auto object-contain drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]"
+            className="h-12 w-auto object-contain drop-shadow-[0_0_10px_rgba(220,38,38,0.5)]"
           />
           <span className="text-xl lg:text-2xl font-bold text-white tracking-wide uppercase font-sans">
             Telemetry Dashboard
@@ -123,7 +124,10 @@ function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRa
 export default function App() {
   const [year, setYear] = useState<number>(2026);
   const [scopeIndex, setScopeIndex] = useState<number>(0);
-  const [loadingMsg, setLoadingMsg] = useState<string>('Initializing Telemetry...');
+
+  // Independent loading states
+  const [showLoader, setShowLoader] = useState<boolean>(true);
+  const [isDataLoaded, setIsDataLoaded] = useState<boolean>(false);
 
   const [driverStats, setDriverStats] = useState<ProcessedSeasonState['driverStats']>({});
   const [teamStats, setTeamStats] = useState<ProcessedSeasonState['teamStats']>({});
@@ -204,7 +208,7 @@ export default function App() {
       for (const y of years) {
         if (!isMounted) return;
 
-        setLoadingMsg(`Calculating ${y} Results...`);
+        // No longer setting loadingMsg state here to prevent component re-renders
         await sleep(300);
 
         timeline[y] = {};
@@ -300,7 +304,7 @@ export default function App() {
         setDriverStats(statsTracker);
         setTeamStats(teamStatsTracker);
         applyDefaultsForYear(2026, cache);
-        setLoadingMsg('');
+        setIsDataLoaded(true); // Signal that background fetches are done
       }
     };
     bootSequence();
@@ -368,10 +372,10 @@ export default function App() {
     return state;
   }, [sessions, globalHistoricalStats, globalTeamHistoricalStats, year, driverStats, teamStats, scopeIndex, liveState]);
 
-  if (loadingMsg) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#04060a] gap-6">
-      <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
-      <div className="text-slate-300 text-lg font-black tracking-widest uppercase animate-pulse">{loadingMsg}</div>
+  // Wait for BOTH the loader animation to finish AND the data to fetch
+  if (showLoader || !isDataLoaded) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0f18]">
+      <F1Loader onLoaded={() => setShowLoader(false)} />
     </div>
   );
 
