@@ -1,4 +1,3 @@
-import React from 'react';
 import { CARS, TEAM_COLORS, TEAM_DISPLAY_NAMES, getNormalizedTeamKey } from '../config';
 import type { LiveRaceSessionState, ProcessedSeasonState } from '../types';
 

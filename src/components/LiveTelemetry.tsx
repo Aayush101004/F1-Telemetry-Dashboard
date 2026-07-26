@@ -1,5 +1,4 @@
-import React from 'react';
-import { LOGOS, TEAM_COLORS, TEAM_DISPLAY_NAMES, getNormalizedTeamKey, getDriverFuzzyImage } from '../config';
+import { TEAM_COLORS, TEAM_DISPLAY_NAMES, getDriverFuzzyImage, getNormalizedTeamKey } from '../config';
 import type { LiveRaceSessionState, ProcessedSeasonState } from '../types';
 
 interface Props {
@@ -25,13 +24,12 @@ export default function LiveTelemetry({ liveState, state }: Props) {
             </div>
 
             <div className="flex flex-col gap-2">
-                {drivers.map((driver, idx) => {
+                {drivers.map((driver) => {
                     const driverId = driver.driverId;
                     const driverName = state.globalNames[driverId] || driverId;
                     const teamId = state.driverTeamMap[driverId];
                     const teamKey = getNormalizedTeamKey(teamId);
                     const color = TEAM_COLORS[teamKey];
-                    const logo = LOGOS[teamKey];
                     const img = getDriverFuzzyImage(driverId);
 
                     const positionChange = driver.startPosition - driver.position;

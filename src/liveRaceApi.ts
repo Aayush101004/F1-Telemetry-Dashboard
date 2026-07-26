@@ -1,4 +1,4 @@
-import type { LiveRaceSessionState, LiveDriverPosition } from './types';
+import type { LiveDriverPosition, LiveRaceSessionState } from './types';
 
 const F1API_BASE = 'https://api.jolpi.ca/ergast/f1';
 
@@ -8,6 +8,18 @@ interface LiveRaceData {
   totalLaps: number;
   flagStatus: 'GREEN' | 'YELLOW' | 'RED' | 'SC' | 'VSC' | 'DOUBLE_YELLOW';
   driverPositions: Record<string, LiveDriverPosition>;
+}
+
+interface ErgastResult {
+  position: string;
+  grid: string;
+  Driver: {
+    driverId: string;
+  };
+  Time?: {
+    time: string;
+  };
+  status: string;
 }
 
 /**
@@ -80,11 +92,11 @@ async function fetchCurrentRaceResults(year: number, round: number): Promise<Rec
   try {
     const res = await fetch(`${F1API_BASE}/${year}/${round}/results.json`);
     const data = await res.json();
-    const results = data?.MRData?.RaceTable?.Races?.[0]?.Results || [];
+    const results: ErgastResult[] = data?.MRData?.RaceTable?.Races?.[0]?.Results || [];
 
     const driverPositions: Record<string, LiveDriverPosition> = {};
 
-    results.forEach((result: any, index: number) => {
+    results.forEach((result, index) => {
       const position = parseInt(result.position) || index + 1;
       const gridPosition = parseInt(result.grid) || 0;
 
@@ -145,11 +157,10 @@ export function startLiveRacePoller(
   onUpdate: (state: LiveRaceSessionState) => void,
   interval: number = 5000 // Anchor poll every 5 seconds by default
 ) {
-  let pollInterval: NodeJS.Timeout | null = null;
-  let simInterval: NodeJS.Timeout | null = null;
+  let pollInterval: ReturnType<typeof setInterval> | null = null;
+  let simInterval: ReturnType<typeof setInterval> | null = null;
   let raceInfo: { round: number; raceTime: Date } | null = null;
   let currentSimState: Record<string, LiveDriverPosition> | null = null;
-  let anchorState: LiveRaceData | null = null;
 
   const clonePositions = (positions: Record<string, LiveDriverPosition>) => JSON.parse(JSON.stringify(positions));
 
@@ -173,9 +184,11 @@ export function startLiveRacePoller(
           for (let i = 0; i < drivers.length - 1; i++) {
             const a = drivers[i];
             const b = drivers[i + 1];
-            // If either driver is not racing, skip
+
+            // If either driver is not racing, skip
             if (a.status !== 'RACING' || b.status !== 'RACING') continue;
-            // Probability scaled by lap (more action mid-race)
+
+            // Probability scaled by lap (more action mid-race)
             const baseProb = 0.02; // 2% base chance each second per adjacent pair
             const rand = Math.random();
             if (rand < baseProb) {
@@ -185,21 +198,25 @@ export function startLiveRacePoller(
               b.position = tmp;
             }
           }
-          // Occasionally simulate a pit stop: pick a random driver and set status
+
+          // Occasionally simulate a pit stop: pick a random driver and set status
           if (Math.random() < 0.005) {
             const all = Object.values(currentSimState);
             const pick = all[Math.floor(Math.random() * all.length)];
             if (pick) pick.status = 'PIT';
           }
-          // After small mutation, ensure positions are normalized (no duplicates)
+
+          // After small mutation, ensure positions are normalized (no duplicates)
           const normalized = Object.values(currentSimState)
             .sort((a, b) => a.position - b.position)
             .map((d, idx) => ({ ...d, position: idx + 1 }));
-          // Rebuild currentSimState with normalized positions
+
+          // Rebuild currentSimState with normalized positions
           const rebuilt: Record<string, LiveDriverPosition> = {};
           normalized.forEach(d => { rebuilt[d.driverId] = d; });
           currentSimState = rebuilt;
-          // Emit the updated state to the UI (keep anchor's lap/flag values)
+
+          // Emit the updated state to the UI (keep anchor's lap/flag values)
           onUpdate({
             isRaceOngoing: anchor.isRaceOngoing,
             currentLap: anchor.currentLap,
@@ -231,8 +248,6 @@ export function startLiveRacePoller(
       if (raceInfo) {
         const liveData = await checkLiveRaceStatus(year, raceInfo.raceTime, raceInfo.round);
 
-        // Anchor the upstream state so simulator stays in sync periodically
-        anchorState = liveData;
         if (liveData.isRaceOngoing) {
           // Start simulator anchored to this upstream snapshot
           startSimulator(liveData);
@@ -247,7 +262,8 @@ export function startLiveRacePoller(
             driverPositions: {}
           });
         }
-        // If race ended, reset raceInfo so next poll will re-discover upcoming races
+
+        // If race ended, reset raceInfo so next poll will re-discover upcoming races
         if (!liveData.isRaceOngoing && raceInfo) {
           raceInfo = null;
         }

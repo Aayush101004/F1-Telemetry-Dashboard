@@ -1,5 +1,4 @@
-import React from 'react';
-import { TEAM_COLORS, TEAM_DISPLAY_NAMES, getNormalizedTeamKey, getDriverFuzzyImage } from '../config';
+import { TEAM_COLORS, TEAM_DISPLAY_NAMES, getDriverFuzzyImage, getNormalizedTeamKey } from '../config';
 import type { LiveRaceSessionState, ProcessedSeasonState } from '../types';
 
 interface Props {
