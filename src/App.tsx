@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { fetchF1SeasonData } from './api';
+import { startLiveRacePoller } from './liveRaceApi';
 import CircuitMap from './components/CircuitMap';
 import ConstructorStandings from './components/ConstructorStandings';
 import DashboardControls from './components/DashboardControls';
@@ -69,10 +70,11 @@ interface NavbarProps {
   scopeIndex: number;
   setScopeIndex: (index: number) => void;
   upcomingRace: UpcomingRace | null;
+  liveState: LiveRaceSessionState;
 }
 
 // Inline Navbar Component
-function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace }: NavbarProps) {
+function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace, liveState }: NavbarProps) {
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
     `px-5 py-2 rounded-lg font-bold transition-all duration-300 ${isActive
       ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
@@ -113,6 +115,7 @@ function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRa
             scopeIndex={scopeIndex}
             setScopeIndex={setScopeIndex}
             upcomingRace={upcomingRace}
+            liveState={liveState}
           />
         </div>
 
@@ -142,7 +145,7 @@ export default function App() {
   const [tooltipState, setTooltipState] = useState<TooltipState>({ type: null, id: null, x: 0, y: 0 });
 
   // Live Race Engine State
-  const [liveState] = useState<LiveRaceSessionState>({
+  const [liveState, setLiveState] = useState<LiveRaceSessionState>({
     isRaceOngoing: false,
     currentLap: 0,
     totalLaps: 58,
@@ -311,6 +314,25 @@ export default function App() {
     return () => { isMounted = false; };
   }, []);
 
+  // Live Race Polling Effect
+  useEffect(() => {
+    if (year !== 2026) return; // Only poll for current year
+
+    let cleanup: (() => void) | null = null;
+    
+    const startPolling = async () => {
+      cleanup = startLiveRacePoller(year, (newState) => {
+        setLiveState(newState);
+      }, 3000); // Poll every 3 seconds
+    };
+
+    startPolling();
+
+    return () => {
+      if (cleanup) cleanup();
+    };
+  }, [year]);
+
   const handleYearChange = (newYear: number) => { setYear(newYear); applyDefaultsForYear(newYear, seasonsCache); };
   const sessions = useMemo(() => seasonsCache[year]?.sessions || [], [seasonsCache, year]);
 
@@ -389,6 +411,7 @@ export default function App() {
           scopeIndex={scopeIndex}
           setScopeIndex={setScopeIndex}
           upcomingRace={seasonsCache[year]?.upcomingRace || null}
+          liveState={liveState}
         />
 
         <div className="w-full max-w-[2560px] mx-auto px-6 pt-8 pb-6 flex flex-col gap-8 flex-1">
@@ -426,7 +449,7 @@ export default function App() {
               <Route path="/analytics" element={
                 <div className="flex flex-col gap-8 w-full animate-fadeIn">
                   <DetailedBreakdown session={sessions[scopeIndex]} state={processedState} scopeIndex={scopeIndex} liveState={liveState} />
-                  <HeadToHeadComparison state={processedState} />
+                  <HeadToHeadComparison state={processedState} sessions={sessions} scopeIndex={scopeIndex} />
                 </div>
               } />
 

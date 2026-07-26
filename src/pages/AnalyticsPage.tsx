@@ -20,7 +20,7 @@ export default function AnalyticsPage({
 }: Props) {
     return (
         <div className="flex flex-col gap-6 p-6">
-            <HeadToHeadComparison state={state} />
+            <HeadToHeadComparison state={state} sessions={sessions} scopeIndex={scopeIndex} />
             <ProgressionCharts
                 state={state}
                 sessions={sessions}

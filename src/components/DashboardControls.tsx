@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { SessionData, UpcomingRace } from '../types';
+import type { LiveRaceSessionState, SessionData, UpcomingRace } from '../types';
 
 interface Props {
     year: number;
@@ -8,20 +8,17 @@ interface Props {
     scopeIndex: number;
     setScopeIndex: (idx: number) => void;
     upcomingRace: UpcomingRace | null;
+    liveState: LiveRaceSessionState;
 }
 
-export default function DashboardControls({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace }: Props) {
+export default function DashboardControls({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace, liveState }: Props) {
     const [timeLeft, setTimeLeft] = useState({ d: '00', h: '00', m: '00', s: '00' });
-    const [isLive, setIsLive] = useState(false);
 
     useEffect(() => {
         if (!upcomingRace || year !== 2026) return;
         const interval = setInterval(() => {
             const gap = upcomingRace.time.getTime() - new Date().getTime();
-            if (gap <= 0) {
-                setIsLive(true);
-                clearInterval(interval);
-            } else {
+            if (gap > 0) {
                 setTimeLeft({
                     d: String(Math.floor(gap / (1000 * 60 * 60 * 24))).padStart(2, '0'),
                     h: String(Math.floor((gap % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))).padStart(2, '0'),
@@ -41,8 +38,14 @@ export default function DashboardControls({ year, setYear, sessions, scopeIndex,
                     <span className="text-slate-500 font-bold uppercase text-xs text-center tracking-widest">F1 {year} Season Complete</span>
                 ) : !upcomingRace ? (
                     <span className="text-slate-500 font-bold uppercase text-xs text-center tracking-widest">Season Complete</span>
-                ) : isLive ? (
-                    <span className="text-emerald-500 font-bold uppercase text-xs text-center tracking-widest">Session Live 🏎️</span>
+                ) : liveState.isRaceOngoing ? (
+                    <div className="flex flex-col items-center gap-1">
+                        <span className="text-red-500 font-bold uppercase text-xs text-center tracking-widest flex items-center gap-1.5">
+                            <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse"></span>
+                            Session Live
+                        </span>
+                        <span className="text-emerald-400 font-mono text-xs text-center">Lap {liveState.currentLap}/{liveState.totalLaps}</span>
+                    </div>
                 ) : (
                     <>
                         <span className="text-slate-500 font-bold text-[9px] uppercase tracking-widest text-center mb-1 block leading-none">NEXT: {upcomingRace.name}</span>

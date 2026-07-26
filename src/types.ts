@@ -79,6 +79,7 @@ export interface LiveDriverPosition {
     positionDelta: number;
     currentLapTime?: string;
     status: 'RACING' | 'PIT' | 'DNF';
+    lastUpdated?: number; // timestamp for tracking changes
 }
 
 export interface LiveRaceSessionState {
@@ -87,4 +88,5 @@ export interface LiveRaceSessionState {
     totalLaps: number;
     flagStatus: RaceFlagStatus;
     driverPositions: Record<string, LiveDriverPosition>;
+    lastUpdate?: number; // timestamp of last update
 }

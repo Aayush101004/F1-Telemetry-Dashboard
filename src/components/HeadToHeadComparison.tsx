@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import type { ProcessedSeasonState } from '../types';
+import type { ProcessedSeasonState, SessionData } from '../types';
 import { getDriverFuzzyImage } from '../utils';
 
 interface HeadToHeadProps {
     state: ProcessedSeasonState;
+    sessions?: SessionData[];
+    scopeIndex?: number;
 }
+
+type ViewMode = 'SEASON_OVERVIEW' | 'RACE_PACE';
 
 // 1. Custom Select Component with Sleek Scrollbar & Cleaned Unused Variables
 function CustomDriverSelect({
@@ -101,7 +105,7 @@ function CustomDriverSelect({
 }
 
 // 2. Main Component
-export default function HeadToHeadComparison({ state }: HeadToHeadProps) {
+export default function HeadToHeadComparison({ state, sessions = [], scopeIndex = 0 }: HeadToHeadProps) {
     const sortedDriverIds = Object.keys(state.globalNames).sort((a, b) => {
         const pointsA = state.globalHistory[a]?.[state.globalHistory[a]?.length - 1] || 0;
         const pointsB = state.globalHistory[b]?.[state.globalHistory[b]?.length - 1] || 0;
@@ -111,6 +115,9 @@ export default function HeadToHeadComparison({ state }: HeadToHeadProps) {
     const [driverA, setDriverA] = useState<string>(sortedDriverIds[0] || '');
     const [driverB, setDriverB] = useState<string>(sortedDriverIds[1] || '');
 
+    // --- Macro vs Micro toggle ---
+    const [viewMode, setViewMode] = useState<ViewMode>('SEASON_OVERVIEW');
+
     if (sortedDriverIds.length < 2) return null;
 
     const statsA = state.driverStats[driverA] || { poles: 0, podiums: 0, titles: 0, debut: 2026 };
@@ -118,6 +125,41 @@ export default function HeadToHeadComparison({ state }: HeadToHeadProps) {
 
     const pointsA = state.globalHistory[driverA]?.[state.globalHistory[driverA]?.length - 1] || 0;
     const pointsB = state.globalHistory[driverB]?.[state.globalHistory[driverB]?.length - 1] || 0;
+
+    // --- Dynamic Telemetry generator based on driver ID hash AND race ---
+    const getDriverTelemetry = (id: string, raceHashSeed: number = 0) => {
+        let hash = raceHashSeed;
+        for (let i = 0; i < id.length; i++) {
+            hash = id.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const positiveHash = Math.abs(hash);
+
+        const topSpeed = 315 + (positiveHash % 25);
+        const throttle = 70 + (positiveHash % 16);
+        const baseSeconds = 18 + (positiveHash % 5);
+        const millis = 100 + (positiveHash % 800);
+        const fastestLap = `1:${baseSeconds}.${millis.toString().padStart(3, '0')}`;
+
+        return { topSpeed, throttle, fastestLap };
+    };
+
+    // Get race-specific hash seed from current race (via global scopeIndex)
+    const getRaceHashSeed = () => {
+        if (sessions.length === 0 || scopeIndex < 0 || scopeIndex >= sessions.length) {
+            return 0;
+        }
+        const session = sessions[scopeIndex];
+        let raceHash = 0;
+        const raceName = session.Circuit?.circuitName || session.title || '';
+        for (let i = 0; i < raceName.length; i++) {
+            raceHash = raceName.charCodeAt(i) + ((raceHash << 5) - raceHash);
+        }
+        return Math.abs(raceHash);
+    };
+
+    const raceHashSeed = getRaceHashSeed();
+    const telemetryA = getDriverTelemetry(driverA, raceHashSeed);
+    const telemetryB = getDriverTelemetry(driverB, raceHashSeed);
 
     const renderStatRow = (label: string, valA: number, valB: number) => {
         const total = valA + valB || 1;
@@ -139,13 +181,45 @@ export default function HeadToHeadComparison({ state }: HeadToHeadProps) {
         );
     };
 
+    const renderTelemetryRow = (label: string, valA: string | number, valB: string | number) => {
+        return (
+            <div className="flex justify-between items-center py-2.5 border-b border-slate-800/60 text-sm font-semibold">
+                <span className="w-1/3 text-left text-red-500 font-bold font-mono">{valA}</span>
+                <span className="w-1/3 text-center text-slate-500 text-[10px] uppercase tracking-widest font-mono">{label}</span>
+                <span className="w-1/3 text-right text-blue-400 font-bold font-mono">{valB}</span>
+            </div>
+        );
+    };
+
     return (
         <div className="w-full bg-[#090d16] border border-slate-800/80 rounded-xl p-6 flex flex-col gap-6">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
                 <h2 className="text-xl font-black uppercase tracking-wider text-white flex items-center gap-2">
                     <span className="w-2 h-5 bg-red-600 rounded-sm inline-block"></span>
                     Head-To-Head Driver Telemetry
                 </h2>
+
+                {/* Macro vs Micro Toggle Switch */}
+                <div className="flex bg-[#04060a] p-1 rounded-lg border border-slate-800/80">
+                    <button
+                        onClick={() => setViewMode('SEASON_OVERVIEW')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${viewMode === 'SEASON_OVERVIEW'
+                            ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.4)]'
+                            : 'text-slate-400 hover:text-white'
+                            }`}
+                    >
+                        Season Overview
+                    </button>
+                    <button
+                        onClick={() => setViewMode('RACE_PACE')}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all ${viewMode === 'RACE_PACE'
+                            ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(220,38,38,0.4)]'
+                            : 'text-slate-400 hover:text-white'
+                            }`}
+                    >
+                        Race Pace
+                    </button>
+                </div>
             </div>
 
             {/* Custom Driver Selectors */}
@@ -170,13 +244,23 @@ export default function HeadToHeadComparison({ state }: HeadToHeadProps) {
                 />
             </div>
 
-            {/* Comparison Metrics */}
-            <div className="flex flex-col gap-2 bg-slate-950/60 p-4 rounded-lg border border-slate-800/50 mt-2">
-                {renderStatRow("Season Points", pointsA, pointsB)}
-                {renderStatRow("Pole Positions", statsA.poles, statsB.poles)}
-                {renderStatRow("Podiums", statsA.podiums, statsB.podiums)}
-                {renderStatRow("World Titles", statsA.titles, statsB.titles)}
-            </div>
+            {/* Comparison Metrics - Conditional based on ViewMode */}
+            {viewMode === 'SEASON_OVERVIEW' ? (
+                <div className="flex flex-col gap-2 bg-slate-950/60 p-4 rounded-lg border border-slate-800/50 mt-2">
+                    {renderStatRow("Season Points", pointsA, pointsB)}
+                    {renderStatRow("Pole Positions", statsA.poles, statsB.poles)}
+                    {renderStatRow("Podiums", statsA.podiums, statsB.podiums)}
+                    {renderStatRow("World Titles", statsA.titles, statsB.titles)}
+                </div>
+            ) : (
+                <div className="space-y-3 px-2 mt-2">
+                    <div className="bg-slate-950/60 p-4 rounded-lg border border-slate-800/50 space-y-1">
+                        {renderTelemetryRow("Top Speed", `${telemetryA.topSpeed} km/h`, `${telemetryB.topSpeed} km/h`)}
+                        {renderTelemetryRow("Average Throttle", `${telemetryA.throttle}%`, `${telemetryB.throttle}%`)}
+                        {renderTelemetryRow("Fastest Lap", telemetryA.fastestLap, telemetryB.fastestLap)}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
