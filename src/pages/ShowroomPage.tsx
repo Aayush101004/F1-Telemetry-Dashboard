@@ -2,22 +2,20 @@ import CircuitMap from '../components/CircuitMap';
 import DriversGrid from '../components/DriversGrid';
 import F1CarViewer from '../components/F1CarViewer';
 import RacePredictions from '../components/RacePredictions';
-import type { LiveRaceSessionState, ProcessedSeasonState, SessionData, UpcomingRace } from '../types';
+import type { ProcessedSeasonState, SessionData, UpcomingRace } from '../types';
 
 interface Props {
     state: ProcessedSeasonState;
     sessions: SessionData[];
     scopeIndex: number;
     upcomingRace: UpcomingRace | null;
-    liveState: LiveRaceSessionState;
 }
 
 export default function ShowroomPage({
     state,
     sessions,
     scopeIndex,
-    upcomingRace,
-    liveState
+    upcomingRace
 }: Props) {
     // Extract current session to pass the track name to the Circuit Map
     const currentSession = sessions[scopeIndex] || {};
@@ -36,7 +34,6 @@ export default function ShowroomPage({
                 scopeIndex={scopeIndex}
                 sessions={sessions}
                 upcomingRace={upcomingRace}
-                liveState={liveState}
             />
 
             <DriversGrid
