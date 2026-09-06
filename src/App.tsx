@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, NavLink, Route, Routes } from 'react-router-dom';
 import { fetchF1SeasonData } from './api';
-import { startLiveRacePoller } from './liveRaceApi';
 import CircuitMap from './components/CircuitMap';
 import ConstructorStandings from './components/ConstructorStandings';
 import DashboardControls from './components/DashboardControls';
@@ -15,8 +14,8 @@ import ProgressionCharts from './components/ProgressionCharts';
 import RacePredictions from './components/RacePredictions';
 import SessionHighlights from './components/SessionHighlights';
 import StandingsTables from './components/StandingsTables';
-import type { LiveRaceSessionState, ProcessedSeasonState, RaceResult, SessionData, TooltipState, UpcomingRace } from './types';
-import { F1_POINTS_MAP, getNormalizedTeamKey } from './utils';
+import type { ProcessedSeasonState, RaceResult, SessionData, TooltipState, UpcomingRace } from './types';
+import { getNormalizedTeamKey } from './utils';
 
 const BASELINE_STATS: Record<string, { poles: number; podiums: number; titles: number; debut: number }> = {
   max_verstappen: { poles: 20, podiums: 77, titles: 2, debut: 2015 },
@@ -70,11 +69,10 @@ interface NavbarProps {
   scopeIndex: number;
   setScopeIndex: (index: number) => void;
   upcomingRace: UpcomingRace | null;
-  liveState: LiveRaceSessionState;
 }
 
 // Inline Navbar Component
-function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace, liveState }: NavbarProps) {
+function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRace }: NavbarProps) {
   const linkClasses = ({ isActive }: { isActive: boolean }) =>
     `px-5 py-2 rounded-lg font-bold transition-all duration-300 ${isActive
       ? "bg-red-600 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]"
@@ -115,7 +113,6 @@ function Navbar({ year, setYear, sessions, scopeIndex, setScopeIndex, upcomingRa
             scopeIndex={scopeIndex}
             setScopeIndex={setScopeIndex}
             upcomingRace={upcomingRace}
-            liveState={liveState}
           />
         </div>
 
@@ -143,15 +140,6 @@ export default function App() {
   const [selectedDrivers, setSelectedDrivers] = useState<Set<string>>(new Set());
   const [selectedTeams, setSelectedTeams] = useState<Set<string>>(new Set());
   const [tooltipState, setTooltipState] = useState<TooltipState>({ type: null, id: null, x: 0, y: 0 });
-
-  // Live Race Engine State
-  const [liveState, setLiveState] = useState<LiveRaceSessionState>({
-    isRaceOngoing: false,
-    currentLap: 0,
-    totalLaps: 58,
-    flagStatus: 'GREEN',
-    driverPositions: {}
-  });
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -211,7 +199,6 @@ export default function App() {
       for (const y of years) {
         if (!isMounted) return;
 
-        // No longer setting loadingMsg state here to prevent component re-renders
         await sleep(300);
 
         timeline[y] = {};
@@ -307,31 +294,12 @@ export default function App() {
         setDriverStats(statsTracker);
         setTeamStats(teamStatsTracker);
         applyDefaultsForYear(2026, cache);
-        setIsDataLoaded(true); // Signal that background fetches are done
+        setIsDataLoaded(true);
       }
     };
     bootSequence();
     return () => { isMounted = false; };
   }, []);
-
-  // Live Race Polling Effect
-  useEffect(() => {
-    if (year !== 2026) return; // Only poll for current year
-
-    let cleanup: (() => void) | null = null;
-    
-    const startPolling = async () => {
-      cleanup = startLiveRacePoller(year, (newState) => {
-        setLiveState(newState);
-      }, 3000); // Poll every 3 seconds
-    };
-
-    startPolling();
-
-    return () => {
-      if (cleanup) cleanup();
-    };
-  }, [year]);
 
   const handleYearChange = (newYear: number) => { setYear(newYear); applyDefaultsForYear(newYear, seasonsCache); };
   const sessions = useMemo(() => seasonsCache[year]?.sessions || [], [seasonsCache, year]);
@@ -366,35 +334,20 @@ export default function App() {
         state.teamHistory[tId][idx] = idx > 0 ? state.teamHistory[tId][idx - 1] : 0;
       });
 
-      const isCurrentScopeLive = liveState.isRaceOngoing && idx === scopeIndex;
+      session.results.forEach(r => {
+        const dId = r.Driver.driverId;
+        const tId = getNormalizedTeamKey(r.Constructor?.constructorId, dId);
+        const pts = parseFloat(r.points) || 0;
 
-      if (isCurrentScopeLive && liveState.currentLap >= 2) {
-        Object.values(liveState.driverPositions).forEach(driver => {
-          const dId = driver.driverId;
-          const tId = state.driverTeamMap[dId] || getNormalizedTeamKey(undefined, dId);
-          const pts = F1_POINTS_MAP[driver.position] || 0;
-
-          state.roundScores[idx][dId] = pts;
-          state.globalHistory[dId][idx] = (idx > 0 ? state.globalHistory[dId][idx - 1] : 0) + pts;
-          state.teamHistory[tId][idx] = (idx > 0 ? state.teamHistory[tId][idx - 1] : 0) + pts;
-        });
-      } else {
-        session.results.forEach(r => {
-          const dId = r.Driver.driverId;
-          const tId = getNormalizedTeamKey(r.Constructor?.constructorId, dId);
-          const pts = parseFloat(r.points) || 0;
-
-          state.globalHistory[dId][idx] += pts;
-          state.teamHistory[tId][idx] += pts;
-          state.roundScores[idx][dId] = pts;
-        });
-      }
+        state.globalHistory[dId][idx] += pts;
+        state.teamHistory[tId][idx] += pts;
+        state.roundScores[idx][dId] = pts;
+      });
     });
 
     return state;
-  }, [sessions, globalHistoricalStats, globalTeamHistoricalStats, year, driverStats, teamStats, scopeIndex, liveState]);
+  }, [sessions, globalHistoricalStats, globalTeamHistoricalStats, year, driverStats, teamStats, scopeIndex]);
 
-  // Wait for BOTH the loader animation to finish AND the data to fetch
   if (showLoader || !isDataLoaded) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0a0f18]">
       <F1Loader onLoaded={() => setShowLoader(false)} />
@@ -411,11 +364,9 @@ export default function App() {
           scopeIndex={scopeIndex}
           setScopeIndex={setScopeIndex}
           upcomingRace={seasonsCache[year]?.upcomingRace || null}
-          liveState={liveState}
         />
 
         <div className="w-full max-w-[2560px] mx-auto px-6 pt-8 pb-6 flex flex-col gap-8 flex-1">
-
           {sessions.length > 0 && (
             <Routes>
               {/* PAGE 1: OVERVIEW (Standings & Highlights) */}
@@ -440,7 +391,7 @@ export default function App() {
                   </div>
 
                   <div className="w-full">
-                    <SessionHighlights sessions={sessions} scopeIndex={scopeIndex} state={processedState} year={year} liveState={liveState} />
+                    <SessionHighlights sessions={sessions} scopeIndex={scopeIndex} state={processedState} year={year} />
                   </div>
                 </div>
               } />
@@ -448,7 +399,7 @@ export default function App() {
               {/* PAGE 2: ANALYTICS (Head-to-head & Detailed Breakdowns) */}
               <Route path="/analytics" element={
                 <div className="flex flex-col gap-8 w-full animate-fadeIn">
-                  <DetailedBreakdown session={sessions[scopeIndex]} state={processedState} scopeIndex={scopeIndex} liveState={liveState} />
+                  <DetailedBreakdown session={sessions[scopeIndex]} state={processedState} scopeIndex={scopeIndex} />
                   <HeadToHeadComparison state={processedState} sessions={sessions} scopeIndex={scopeIndex} />
                 </div>
               } />
@@ -481,7 +432,6 @@ export default function App() {
                       scopeIndex={scopeIndex + 1}
                       sessions={sessions}
                       upcomingRace={seasonsCache[year]?.upcomingRace}
-                      liveState={liveState}
                     />
                   )}
 
