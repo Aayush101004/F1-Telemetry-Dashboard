@@ -73,18 +73,14 @@ export default function F1Loader({ onLoaded }: { onLoaded?: () => void }) {
                     // Column lights up if its index is less than the current step (e.g., step 1 lights index 0)
                     const isLit = colIndex < step && !isExtinguishing;
                     return (
-                        <div key={colIndex} className="flex flex-col gap-3">
-                            {/* Top Bulb */}
-                            <div className={`w-8 h-8 rounded-full transition-all duration-300 border ${isLit
+                        <div 
+                            key={colIndex} 
+                            className={`w-8 h-8 rounded-full transition-all duration-300 border ${
+                                isLit
                                     ? 'bg-red-600 border-red-400 shadow-[0_0_25px_rgba(239,68,68,0.9)] scale-105'
                                     : 'bg-[#1a2230] border-slate-700/60 shadow-inner'
-                                }`} />
-                            {/* Bottom Bulb */}
-                            <div className={`w-8 h-8 rounded-full transition-all duration-300 border ${isLit
-                                    ? 'bg-red-600 border-red-400 shadow-[0_0_25px_rgba(239,68,68,0.9)] scale-105'
-                                    : 'bg-[#1a2230] border-slate-700/60 shadow-inner'
-                                }`} />
-                        </div>
+                            }`} 
+                        />
                     );
                 })}
             </div>

@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
-import type { LiveRaceSessionState, ProcessedSeasonState, SessionData, UpcomingRace } from '../types';
+import type { ProcessedSeasonState, SessionData, UpcomingRace } from '../types';
 
 interface Props {
     state: ProcessedSeasonState;
     scopeIndex: number; // Target race being predicted
     sessions: SessionData[];
     upcomingRace?: UpcomingRace | null;
-    liveState?: LiveRaceSessionState;
 }
 
 type RealSessionData = SessionData & {
@@ -19,9 +18,7 @@ type RealUpcomingRace = UpcomingRace & {
     isSprint?: boolean;
 };
 
-export default function RacePredictions({ state, scopeIndex, sessions, upcomingRace, liveState }: Props) {
-    const isRaceOngoing = liveState?.isRaceOngoing && (liveState?.currentLap || 0) < (liveState?.totalLaps || 58);
-
+export default function RacePredictions({ state, scopeIndex, sessions, upcomingRace }: Props) {
     const isPredictingFuture = scopeIndex >= sessions.length;
 
     // Grab the target session object
@@ -103,21 +100,6 @@ export default function RacePredictions({ state, scopeIndex, sessions, upcomingR
 
         return driverScores.sort((a, b) => b.powerScore - a.powerScore).slice(0, 3).map(d => d.dId);
     }, [state.globalHistory, state.roundScores, state.globalNames, scopeIndex, sessions]);
-
-    // If race is ongoing, show the Live Banner state
-    if (isRaceOngoing) {
-        return (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center gap-3 text-center mb-8">
-                <div className="w-3 h-3 bg-red-600 rounded-full animate-ping"></div>
-                <h3 className="text-lg font-black uppercase text-white tracking-widest">
-                    Race In Progress
-                </h3>
-                <p className="text-xs font-mono text-slate-400">
-                    Telemetry model & post-race podium predictions will recalculate upon checkered flag completion.
-                </p>
-            </div>
-        );
-    }
 
     if (!targetSession) return null;
 

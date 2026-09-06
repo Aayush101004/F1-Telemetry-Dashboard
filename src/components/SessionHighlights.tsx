@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { TEAM_COLORS, TEAM_DISPLAY_NAMES, getDriverFuzzyImage, getNormalizedTeamKey } from '../config';
-import type { LiveRaceSessionState, ProcessedSeasonState, RaceResult, SessionData } from '../types';
+import type { ProcessedSeasonState, RaceResult, SessionData } from '../types';
 
 type PitStop = {
     driverId: string;
@@ -30,7 +30,7 @@ function SessionHighlightsBlockCard<T extends SessionEntity>({ title, drivers, m
             <div className="flex flex-col gap-3.5">
                 {drivers.map((d, i) => {
                     const dId = 'Driver' in d ? d.Driver.driverId : d.driverId;
-                    const name = 'Driver' in d ? `${d.Driver.givenName} ${d.Driver.familyName}` : state.globalNames[dId];
+                    const name = 'Driver' in d && d.Driver.givenName ? `${d.Driver.givenName} ${d.Driver.familyName}` : state.globalNames[dId];
                     const tId = 'Constructor' in d ? d.Constructor?.constructorId || state.driverTeamMap[dId] : state.driverTeamMap[dId];
                     const teamKey = getNormalizedTeamKey(tId);
                     const color = TEAM_COLORS[teamKey];
@@ -82,20 +82,15 @@ interface Props {
     scopeIndex: number;
     state: ProcessedSeasonState;
     year: number;
-    liveState?: LiveRaceSessionState;
 }
 
-export default function SessionHighlights({ sessions, scopeIndex, state, year, liveState }: Props) {
+export default function SessionHighlights({ sessions, scopeIndex, state, year }: Props) {
     const session = sessions[scopeIndex];
     const [pitStops, setPitStops] = useState<PitStop[] | null>(null);
     const [pitError, setPitError] = useState(false);
-    const isLive = liveState?.isRaceOngoing;
 
     useEffect(() => {
-        if (!session || isLive) {
-            if (isLive) {
-                queueMicrotask(() => { setPitStops([]); });
-            }
+        if (!session) {
             return;
         }
 
@@ -123,23 +118,9 @@ export default function SessionHighlights({ sessions, scopeIndex, state, year, l
         }
         queueMicrotask(() => { void loadPitStops(); });
         return () => { isMounted = false; };
-    }, [scopeIndex, session, year, sessions, isLive]);
+    }, [scopeIndex, session, year, sessions]);
 
     if (!session || !session.results) return null;
-
-    if (isLive) {
-        return (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 flex flex-col items-center justify-center gap-3 text-center mb-8">
-                <div className="w-3 h-3 bg-red-600 rounded-full animate-ping"></div>
-                <h3 className="text-lg font-black uppercase text-white tracking-widest">
-                    Session Highlights Pending
-                </h3>
-                <p className="text-xs font-mono text-slate-400">
-                    Fastest laps and pit lane times will be populated upon checkered flag completion.
-                </p>
-            </div>
-        );
-    }
 
     const fastestLaps = [...session.results].filter(r => r.FastestLap?.rank).sort((a, b) => parseInt(a.FastestLap!.rank!) - parseInt(b.FastestLap!.rank!)).slice(0, 5);
     const startingGrid = [...session.results].sort((a, b) => parseInt(a.grid) - parseInt(b.grid)).slice(0, 5);
