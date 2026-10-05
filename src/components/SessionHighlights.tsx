@@ -17,9 +17,10 @@ interface BlockCardProps<T extends SessionEntity> {
     error?: boolean;
     emptyMsg: string;
     state: ProcessedSeasonState;
+    hideRank?: boolean;
 }
 
-function SessionHighlightsBlockCard<T extends SessionEntity>({ title, drivers, metricFn, loading, error, emptyMsg, state }: BlockCardProps<T>) {
+function SessionHighlightsBlockCard<T extends SessionEntity>({ title, drivers, metricFn, loading, error, emptyMsg, state, hideRank }: BlockCardProps<T>) {
     if (loading) return <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-5 flex flex-col h-full"><h3 className="text-emerald-400 font-black uppercase text-sm mb-4 border-b border-slate-800/60 pb-2">{title}</h3><div className="text-emerald-500/80 text-xs font-mono font-bold text-center my-auto animate-pulse">Fetching track telemetry...</div></div>;
     if (error) return <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-5 flex flex-col h-full"><h3 className="text-red-400 font-black uppercase text-sm mb-4 border-b border-red-900/60 pb-2">{title}</h3><div className="text-red-500/80 text-xs font-bold text-center my-auto">Failed to load (API Limit)</div></div>;
     if (drivers.length === 0) return <div className="bg-slate-900/40 border border-slate-800/60 rounded-xl p-5 flex flex-col h-full"><h3 className="text-slate-400 font-black uppercase text-sm mb-4 border-b border-slate-800/60 pb-2">{title}</h3><div className="text-slate-500 text-xs text-center my-auto">{emptyMsg}</div></div>;
@@ -50,7 +51,7 @@ function SessionHighlightsBlockCard<T extends SessionEntity>({ title, drivers, m
                                     <span className="text-[9px] text-slate-400 font-semibold uppercase mt-1 truncate">{TEAM_DISPLAY_NAMES[teamKey]}</span>
                                     <span className="font-mono text-emerald-400 font-bold text-sm mt-0.5">{metricFn(d)}</span>
                                 </div>
-                                {title !== "Starting Grid" && (
+                                {!hideRank && title !== "Starting Grid" && (
                                     <div className="flex items-center gap-3 shrink-0">
                                         <span className="font-black text-yellow-500 text-sm italic w-6 text-right">P1</span>
                                     </div>
@@ -67,7 +68,7 @@ function SessionHighlightsBlockCard<T extends SessionEntity>({ title, drivers, m
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
                                 <span className="font-mono text-slate-400 text-xs">{metricFn(d)}</span>
-                                <span className="font-black text-slate-700 text-sm italic w-6 text-right">P{i + 1}</span>
+                                {!hideRank && <span className="font-black text-slate-700 text-sm italic w-6 text-right">P{i + 1}</span>}
                             </div>
                         </div>
                     );
@@ -122,11 +123,50 @@ export default function SessionHighlights({ sessions, scopeIndex, state, year }:
 
     if (!session || !session.results) return null;
 
+    // 1. Fastest Laps & Grid
     const fastestLaps = [...session.results].filter(r => r.FastestLap?.rank).sort((a, b) => parseInt(a.FastestLap!.rank!) - parseInt(b.FastestLap!.rank!)).slice(0, 5);
     const startingGrid = [...session.results].sort((a, b) => parseInt(a.grid) - parseInt(b.grid)).slice(0, 5);
 
+    // 2. Biggest Movers (Positions Gained)
+    const biggestMovers = [...session.results]
+        .filter(r => {
+            const grid = parseInt(r.grid, 10);
+            const pos = parseInt(r.position, 10);
+            return grid > 0 && pos > 0 && (grid - pos) > 0;
+        })
+        .sort((a, b) => {
+            const gainedA = parseInt(a.grid, 10) - parseInt(a.position, 10);
+            const gainedB = parseInt(b.grid, 10) - parseInt(b.position, 10);
+            return gainedB - gainedA; // Sort highest gained to lowest
+        })
+        .slice(0, 5);
+
+    // 3. Session Retirements (DNFs)
+    const retirements = [...session.results]
+        .filter(r => {
+            const statusLower = (r.status || "Finished").toLowerCase();
+            return statusLower !== "finished" && !statusLower.includes("lap") && !(r.status || "").match(/^\+\d/);
+        });
+
+    // 4. Toughest Races (Positions Lost, excluding DNFs)
+    const biggestDrops = [...session.results]
+        .filter(r => {
+            const grid = parseInt(r.grid, 10);
+            const pos = parseInt(r.position, 10);
+            const statusLower = (r.status || "Finished").toLowerCase();
+            const isDNF = statusLower !== "finished" && !statusLower.includes("lap") && !(r.status || "").match(/^\+\d/);
+            
+            return grid > 0 && pos > 0 && (pos - grid) > 0 && !isDNF;
+        })
+        .sort((a, b) => {
+            const lostA = parseInt(a.position, 10) - parseInt(a.grid, 10);
+            const lostB = parseInt(b.position, 10) - parseInt(b.grid, 10);
+            return lostB - lostA; // Sort highest lost to lowest
+        })
+        .slice(0, 5);
+
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <SessionHighlightsBlockCard<PitStop>
                 title="Fastest Pit Lane Times"
                 drivers={pitStops || []}
@@ -149,6 +189,30 @@ export default function SessionHighlights({ sessions, scopeIndex, state, year }:
                 metricFn={d => `Grid: ${d.grid}`}
                 emptyMsg="Data unavailable"
                 state={state}
+                hideRank={true}
+            />
+            <SessionHighlightsBlockCard<RaceResult>
+                title="Biggest Movers"
+                drivers={biggestMovers}
+                metricFn={d => `+${parseInt(d.grid, 10) - parseInt(d.position, 10)} Places`}
+                emptyMsg="No positions gained"
+                state={state}
+            />
+            <SessionHighlightsBlockCard<RaceResult>
+                title="Toughest Races"
+                drivers={biggestDrops}
+                metricFn={d => `-${parseInt(d.position, 10) - parseInt(d.grid, 10)} Places`}
+                emptyMsg="No positions lost"
+                state={state}
+                hideRank={true}
+            />
+            <SessionHighlightsBlockCard<RaceResult>
+                title="Session Retirements"
+                drivers={retirements}
+                metricFn={d => d.status || "DNF"}
+                emptyMsg="No retirements"
+                state={state}
+                hideRank={true}
             />
         </div>
     );
